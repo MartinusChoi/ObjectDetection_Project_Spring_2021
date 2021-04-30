@@ -1,3 +1,5 @@
+['Lightning in 2 steps'](https://pytorch-lightning.readthedocs.io/en/latest/starter/new-project.html)의 내용을 기반으로 하고 있습니다.
+
 ## PyTorch Lightning으로 code를 Organizing 하면 :
 
 - research code를 engineering에서 분리하여 더욱 읽기 쉽게 만들어 줍니다.
