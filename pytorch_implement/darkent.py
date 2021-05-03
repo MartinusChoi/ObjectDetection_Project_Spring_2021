@@ -178,3 +178,19 @@ def creat_modules(blocks):
 class EmptyLayer(nn.Module):
     def __init__(self):
         super(EmptyLayer, self).__init()
+
+"""
+EmptyLayer
+
+다른 layer들 처럼 작업을 수행함.
+=> previous layer 앞으로 가져오기 / concatenation
+
+PyTorch에서 새로운 layer를 정의할 때 nn.Module을 subclass하고,
+nn.Module object의 foward 함수에 layer가 수행하는 작업들을 작성함.
+
+Route block을 위한 layer를 디자인하기 위해, 멤버로서 attribute layers의 값으로 초기화된 nn.Module object를 만들어야함.
+=> 그 다음 foward 함수에 concatenate/feature map 앞으로 가져오는 작업에 대한 코드를 작성할 수 있다.
+
+마지막으로, 네트워크의 foward 함수에서 해당 layer를 실행함.
+
+"""
