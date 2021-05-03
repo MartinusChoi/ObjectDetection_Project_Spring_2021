@@ -42,6 +42,7 @@ def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
 
     x_y_offset = torch.cat((x_offset, y_offset), 1).repeat(1,num_anchors).view(-1,2).unsqueeze(0)
 
+    # error!!!
     prediction[:,:,:2] += x_y_offset
 
     # log space transform height and the width

@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-from util import *
+from utils import *
 
 def parse_cfg(cfgfile) :
     """
@@ -274,7 +274,7 @@ class Darknet(nn.Module):
                 from_ = int(module["from"])
                 x = outputs[i-1] + outputs[i+from_]
             
-            elif module_type == 'yolo':        
+            elif module_type == 'yolo':
                 anchors = self.module_list[i][0].anchors
                 #Get the input dimensions
                 inp_dim = int (self.net_info["height"])
@@ -297,7 +297,7 @@ class Darknet(nn.Module):
         return detections
             
 def get_test_input():
-    img = cv2.imread("dog-cycle-car.png")
+    img = cv2.imread("./pytorch_implement/dog-cycle-car.png")
     img = cv2.resize(img, (416,416))          #Resize to the input dimension
     img_ =  img[:,:,::-1].transpose((2,0,1))  # BGR -> RGB | H X W C -> C X H X W 
     img_ = img_[np.newaxis,:,:,:]/255.0       #Add a channel at 0 (for batch) | Normalise
@@ -305,7 +305,8 @@ def get_test_input():
     img_ = Variable(img_)                     # Convert to Variable
     return img_
 
-model = Darknet("cfg/yolov3.cfg")
+model = Darknet("./pytorch_implement/cfg/yolov3.cfg")
 inp = get_test_input()
+print(torch.cuda.is_available())
 pred = model(inp, torch.cuda.is_available())
 print (pred)
