@@ -13,6 +13,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
+from util import *
+
 def parse_cfg(cfgfile) :
     """
     Configuration 파일을 인자로 받음.
@@ -55,7 +57,7 @@ def parse_cfg(cfgfile) :
 
     return blocks
 
-def creat_modules(blocks):
+def create_modules(blocks):
     """
     return : nn.ModuleList
 
@@ -89,6 +91,29 @@ def creat_modules(blocks):
     iterate 마다 각 block의 output filter 수를 output_filters 리스트에 append.
     """
 
+    """
+    EmptyLayer
+
+    다른 layer들 처럼 작업을 수행함.
+    => previous layer 앞으로 가져오기 / concatenation
+
+    PyTorch에서 새로운 layer를 정의할 때 nn.Module을 subclass하고,
+    nn.Module object의 foward 함수에 layer가 수행하는 작업들을 작성함.
+
+    Route block을 위한 layer를 디자인하기 위해, 
+    멤버로서 attribute layers의 값으로 초기화된 nn.Module object를 만들어야함.
+    => 그 다음 foward 함수에 concatenate/feature map 앞으로 가져오는 작업에 대한 코드를 작성할 수 있다.
+    => 마지막으로, 네트워크의 foward 함수에서 해당 layer를 실행함.
+
+    하지만 주어진 concatenate된 코드는 간결함 => feature map에 torch.cat 호출
+
+    위와 같이 layer를 디자인하는 것은 불필요한 추상화 발생 => boiler plate code만 증가시킴.
+
+    하지만 route layer 자리에 dummy layer를 두게 되면 
+    darknet을 나타내는 nn.Module object의 forward 함수에서 바로 concatenate 할 수 있게 됨.
+
+    """
+
     net_info = blocks[0] # 첫 번째 block의 pre-processing(전처리)와 입력에 관한 정보 저장
     module_list = nn.ModuleList()
     prev_filters = 3
@@ -105,6 +130,7 @@ def creat_modules(blocks):
         if (block["type"] == "convolutional"):
             # Get the info about the layer
             activation = block["activation"]
+
             try:
                 batch_normalize = int(block["batch_normalize"])
                 bias = False
@@ -149,14 +175,14 @@ def creat_modules(blocks):
             block["layers"] = block["layers"].split(',')
 
             # Start of a route
-            start = int(block["layers"][0])
+            start = int(block["layers"][0]) # 몇 index 앞에서 feature map을 가져올 지 에 대한 값
             # end, if there exists one.
             try:
                 end = int(block["layers"][1])
             except:
                 end = 0
             
-            # Positive anotation
+            # Positive anotation (양수 값이 넘어온 경우 앞에서 부터 index 탐색)
             if start > 0:
                 start = start - index
             if end > 0:
@@ -165,6 +191,10 @@ def creat_modules(blocks):
             route = EmptyLayer()
             module.add_module("route_{0}".format(index), route)
 
+            # route layer에서 나온 filter의 수를 담도록 filters 변수를 업데이트
+            # shortcut layer도 간단한 작업(addition)을 수행하기에 empty layer를 사용하지만
+            # 이전 layer의 feature map에 바로 뒤 layer의 feature map을 더하는 작업을 하기 때문에
+            # filters 변수를 업데이트 할 필요가 없음. => 몇 layer 전이 아닌 단지 이전만 addition
             if end < 0:
                 filters = output_filters[index + start] + output_filters[index + end]
             else:
@@ -174,23 +204,108 @@ def creat_modules(blocks):
         elif (block["type"] == "shortcut") :
             shortcut = EmptyLayer()
             module.add_module("shortcut_{}".format(index), shortcut)
+        
+        # YOLO is the detection layer
+        elif (block["type"] == "yolo"):
+            mask = block["mask"].split(",")
+            mask = [int(x) for x in mask]
+
+            anchors = block["anchors"].split(",")
+            anchors = [int(a) for a in anchors]
+            anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors),2)]
+            anchors = [anchors[i] for i in mask]
+
+            # Bounding box를 detect하는데 사용되는 anchors들을 가지고 있는 DetectionLayer
+            detection = DetectionLayer(anchors)
+            module.add_module("Detection_{}".format(index), detection)
+        
+        module_list.append(module)
+        prev_filters = filters
+        output_filters.append(filters)
+
+    return (net_info, module_list)
 
 class EmptyLayer(nn.Module):
     def __init__(self):
-        super(EmptyLayer, self).__init()
+        super(EmptyLayer, self).__init__()
 
-"""
-EmptyLayer
+class DetectionLayer(nn.Module):
+    def __init__(self, anchors):
+        super(DetectionLayer, self).__init__()
+        self.anchors = anchors
 
-다른 layer들 처럼 작업을 수행함.
-=> previous layer 앞으로 가져오기 / concatenation
+class Darknet(nn.Module):
+    def __init__(self, cfgfile):
+        super(Darknet, self).__init__()
+        self.blocks = parse_cfg(cfgfile)
+        self.net_info, self.module_list = create_modules(self.blocks)
+    
+    def forward(self, x, CUDA):
+        modules = self.blocks[1:] # blocks[0] -> net_info
+        outputs = {} # cache all the outputs for the route layer (Key : index, value : feature map)
+        
+        write = 0
+        
+        for i, module in enumerate(modules):
+            module_type = (module["type"])
 
-PyTorch에서 새로운 layer를 정의할 때 nn.Module을 subclass하고,
-nn.Module object의 foward 함수에 layer가 수행하는 작업들을 작성함.
+            if module_type == "convolutional" or module_type == "upsample":
+                x = self.module_list[i](x)
+            
+            elif module_type == "route":
+                layers = module["layers"]
+                layers = [int(a) for a in layers]
 
-Route block을 위한 layer를 디자인하기 위해, 멤버로서 attribute layers의 값으로 초기화된 nn.Module object를 만들어야함.
-=> 그 다음 foward 함수에 concatenate/feature map 앞으로 가져오는 작업에 대한 코드를 작성할 수 있다.
+                if (layers[0]) > 0:
+                    layers[0] = layers[0] - i
+                
+                if len(layers) == 1:
+                    x = outputs[i + (layers[0])]
+                
+                else:
+                    if (layers[1]) > 0:
+                        layers[1] = layers[1] - i
+                    
+                    map1 = outputs[i + layers[0]]
+                    map2 = outputs[i + layers[1]]
+                    x = torch.cat((map1, map2), 1)
+            
+            elif module_type == "shortcut":
+                from_ = int(module["from"])
+                x = outputs[i-1] + outputs[i+from_]
+            
+            elif module_type == 'yolo':        
+                anchors = self.module_list[i][0].anchors
+                #Get the input dimensions
+                inp_dim = int (self.net_info["height"])
+        
+                #Get the number of classes
+                num_classes = int (module["classes"])
+        
+                #Transform 
+                x = x.data
+                x = predict_transform(x, inp_dim, anchors, num_classes, CUDA)
+                if not write:              #if no collector has been intialised. 
+                    detections = x
+                    write = 1
+        
+                else:       
+                    detections = torch.cat((detections, x), 1)
+        
+            outputs[i] = x
+        
+        return detections
+            
+def get_test_input():
+    img = cv2.imread("dog-cycle-car.png")
+    img = cv2.resize(img, (416,416))          #Resize to the input dimension
+    img_ =  img[:,:,::-1].transpose((2,0,1))  # BGR -> RGB | H X W C -> C X H X W 
+    img_ = img_[np.newaxis,:,:,:]/255.0       #Add a channel at 0 (for batch) | Normalise
+    img_ = torch.from_numpy(img_).float()     #Convert to float
+    img_ = Variable(img_)                     # Convert to Variable
+    return img_
 
-마지막으로, 네트워크의 foward 함수에서 해당 layer를 실행함.
-
-"""
+model = Darknet("cfg/yolov3.cfg")
+inp = get_test_input()
+pred = model(inp, torch.cuda.is_available())
+print (pred)
