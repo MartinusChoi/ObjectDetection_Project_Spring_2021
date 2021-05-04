@@ -12,12 +12,15 @@ import numpy as np
 import cv2
 
 def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
-    batch_size = prediction.size(0)
-    stride =  inp_dim // prediction.size(2)
+    batch_size = prediction.size(0) # batch = 1
+    stride =  inp_dim // prediction.size(2) # inp_dim = height = 416
     grid_size = inp_dim // stride
     bbox_attrs = 5 + num_classes
     num_anchors = len(anchors)
 
+    if CUDA: # solve device problem
+        prediction = prediction.cuda()
+    
     prediction = prediction.view(batch_size, bbox_attrs*num_anchors, grid_size*grid_size)
     prediction = prediction.transpose(1,2).contiguous()
     prediction = prediction.view(batch_size, grid_size*grid_size*num_anchors, bbox_attrs)
@@ -40,9 +43,11 @@ def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
         x_offset = x_offset.cuda()
         y_offset = y_offset.cuda()
 
-    x_y_offset = torch.cat((x_offset, y_offset), 1).repeat(1,num_anchors).view(-1,2).unsqueeze(0)
+    x_y_offset = torch.cat((x_offset, y_offset), 1).repeat(1,num_anchors).view(-1,2).unsqueeze(0) # it is on device(cuda)
 
-    # error!!!
+    # error!!! -> device problem
+    # case 1 : is prediction is on cpu..? => Yes! (confirm with '.is_cuda')
+    # solve it => set device cuda on top of code
     prediction[:,:,:2] += x_y_offset
 
     # log space transform height and the width

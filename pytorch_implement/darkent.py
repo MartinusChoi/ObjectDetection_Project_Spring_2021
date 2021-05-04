@@ -159,6 +159,7 @@ def create_modules(blocks):
             
             # Check the activation
             # YOLO는 Linear 혹은 Leaky ReLU를 사용함.
+            # Linear는 선형 함수이므로 따로 activation module이 없는 것과 같음.
             if activation == "leaky":
                 activn = nn.LeakyReLU(0.1, inplace = True)
                 module.add_module("leaky_{0}".format(index), activn)
@@ -272,7 +273,7 @@ class Darknet(nn.Module):
             
             elif module_type == "shortcut":
                 from_ = int(module["from"])
-                x = outputs[i-1] + outputs[i+from_]
+                x = outputs[i-1] + outputs[i+from_] # 이전 layer의 output과 from_ layer의 output을 더함 => shortcut
             
             elif module_type == 'yolo':
                 anchors = self.module_list[i][0].anchors
@@ -289,7 +290,7 @@ class Darknet(nn.Module):
                     detections = x
                     write = 1
         
-                else:       
+                else:
                     detections = torch.cat((detections, x), 1)
         
             outputs[i] = x
@@ -298,15 +299,14 @@ class Darknet(nn.Module):
             
 def get_test_input():
     img = cv2.imread("./pytorch_implement/dog-cycle-car.png")
-    img = cv2.resize(img, (416,416))          #Resize to the input dimension
-    img_ =  img[:,:,::-1].transpose((2,0,1))  # BGR -> RGB | H X W C -> C X H X W 
-    img_ = img_[np.newaxis,:,:,:]/255.0       #Add a channel at 0 (for batch) | Normalise
-    img_ = torch.from_numpy(img_).float()     #Convert to float
+    img = cv2.resize(img, (416,416))          #Resize to the input dimension (cfg file과 동일하게 맞추기!! net_info)
+    img_ =  img[:,:,::-1].transpose((2,0,1))  # BGR -> RGB | H X W X C -> C X H X W / ::-1 -> 해당 axis에서 순서를 반대로 바꿈(channel의 순서를 뒤집기) 
+    img_ = img_[np.newaxis,:,:,:]/255.0       # Add a channel at 0 (for batch) | Normalise
+    img_ = torch.from_numpy(img_).float()     # Convert to float
     img_ = Variable(img_)                     # Convert to Variable
     return img_
 
 model = Darknet("./pytorch_implement/cfg/yolov3.cfg")
 inp = get_test_input()
-print(torch.cuda.is_available())
-pred = model(inp, torch.cuda.is_available())
+pred = model(x = inp, CUDA = torch.cuda.is_available())
 print (pred)
