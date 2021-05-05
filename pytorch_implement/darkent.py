@@ -12,58 +12,17 @@ batch의 각 이미지당 10647 x 85 크기의 테이블을 가짐
 85 = (4 bbox attributes, 1 object score, 80 class score)
 """
 
-# enable use python 3 code in python 2
-from __future__ import division
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-from utils import *
+import cv2
 
-def parse_cfg(cfgfile) :
-    """
-    Configuration 파일을 인자로 받음.
-
-    Blocks 리스트를 리턴함.
-    각 block은 neural network를 어떻게 빌드하는지에 대해 나타냄.
-    Blocks는 dictionary들의 리스트임.
-
-    함수의 목적 : cfg를 파싱 => 모든 block을 dict 형식으로 저장하는 것.
-
-    Block들의 attribute들과 value들은 dictionary에 key-value 형식으로 저장됨.
-
-    code : cfg 파싱 => 이러한 dicts들을 block 변수에 저장 => blocks라는 list에 dicts들을 append.
-
-    return : list
-    """
-
-    file = open(cfgfile, 'r') # file open
-    lines = file.read().split('\n') # 개행(line) 기준으로 나누어 list로 저장
-    lines = [line for line in lines if len(line) > 0] # 비어있지 않은 line들만 추출 (빈 line 제거)
-    lines = [line for line in lines if line[0] != '#'] # 주석이 아닌 line들만 추출 (주석 line 제거)
-    lines = [line.rstrip().lstrip() for line in lines] # white space 제거
-
-    block = {}
-    blocks = []
-
-    for line in lines:
-        if line[0] == "[":      # new block start
-            if len(block) != 0:     # block is not empty => append it next the previous block
-                blocks.append(block)        # append to block list
-                block = {}      # empty block
-            block["type"] = line[1:-1].rstrip()         # 대괄호를 제외한 block의 이름을 dict로 생성
-            # ie : block = {"type" : 'net'}
-        else:
-            key, value = line.split("=")
-            block[key.rstrip()] = value.lstrip()
-            # ie : block = {'batch' : 64, 'subdivisions'=16, ...}
-    blocks.append(block)
-    # ie : blocks = [{"type" : 'net', 'batch' : 64, ...}, {"type" : 'convolution', 'filters' : 32, ...}]
-
-    return blocks
+from utils.utils import predict_transform
+from utils.parse_config import parse_cfg
+from utils.layers import EmptyLayer, DetectionLayer
 
 def create_modules(blocks):
     """
@@ -233,15 +192,6 @@ def create_modules(blocks):
         output_filters.append(filters)
 
     return (net_info, module_list)
-
-class EmptyLayer(nn.Module):
-    def __init__(self):
-        super(EmptyLayer, self).__init__()
-
-class DetectionLayer(nn.Module):
-    def __init__(self, anchors):
-        super(DetectionLayer, self).__init__()
-        self.anchors = anchors
 
 class Darknet(nn.Module):
     def __init__(self, cfgfile):
