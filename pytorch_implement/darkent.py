@@ -4,6 +4,14 @@ Darknet : YOLO 구조의 이름
 YOLO 네트워크를 구현하는 코드를 작성
 """
 
+"""
+batch의 각 이미지당 10647 x 85 크기의 테이블을 가짐
+
+10674 = 테이블의 행 => bounding box를 나타냄
+
+85 = (4 bbox attributes, 1 object score, 80 class score)
+"""
+
 # enable use python 3 code in python 2
 from __future__ import division
 
@@ -296,7 +304,38 @@ class Darknet(nn.Module):
             outputs[i] = x
         
         return detections
-            
+
+        def load_weights(self, weightfile):
+            fp = open(weightfile, "rb")
+
+            # 첫 5개의 값은 header information임.
+            # 1. Major version number
+            # 2. Minor version number
+            # 3. Subversion number
+            # 4, 5. Image seen by the network (during training)
+            header = np.fromfile(fp, dtype = np.int32, count=5)
+            self.header = torch.form_numpy(header)
+            self.seen = self.header[3]
+
+            # weight들을 np.ndarray로 로드
+            weights = np.fromfile(fp, dtype=np.float32)
+
+            ptr = 0 # weights array의 어느 위치에 있는지 계속 추적
+            for i in range(len(self.module_list)):
+                module_type = self.blocks[i + 1]["type"]
+
+                # if type if convolutional load weight
+                # Otherwise ignore
+                if module_type == "convolutional":
+                    model = self.moduel_list[i]
+
+                    try:
+                        batch_normalize = int(self.blocks[i+1]["batch_normalize"])
+                    except:
+                        batch_nomalize = 0
+                    
+                    conv = model[0]
+
 def get_test_input():
     img = cv2.imread("./pytorch_implement/dog-cycle-car.png")
     img = cv2.resize(img, (416,416))          #Resize to the input dimension (cfg file과 동일하게 맞추기!! net_info)
@@ -309,4 +348,5 @@ def get_test_input():
 model = Darknet("./pytorch_implement/cfg/yolov3.cfg")
 inp = get_test_input()
 pred = model(x = inp, CUDA = torch.cuda.is_available())
-print (pred)
+print(pred)
+print(pred.shape)
