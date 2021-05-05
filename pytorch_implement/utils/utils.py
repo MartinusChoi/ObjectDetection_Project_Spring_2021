@@ -7,7 +7,12 @@ write_results : objectness 점수 thresholding과 non-maximal suppression => tru
 => confidence : objectness score threshold
 => nms_conf : NMS IoU threshold
 => 예측된 Tensor -> (Batch size)x10647의 bounding box들에 대한 정보를 지님.
-
+=> result : D x 8의 tensro 형태로 반환 (D = 이미지 전체에서의 true detection의 수(row))
+    => 1. batch에서의 이미지 인덱스
+    => 2~5. 4개의 꼭짓점 좌표
+    => 6. objectness score
+    => 7. maximum confidencef를 가진 class의 score
+    => 8. 그 class의 index
 """
 
 from __future__ import division
@@ -145,7 +150,6 @@ def write_result(prediction, confidence, num_classes, nms_conf = 0.4):
                     ious = bbox_iou(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:])
                 except ValueError:
                     break
-            
                 except IndexError:
                     break
             
@@ -166,8 +170,38 @@ def write_result(prediction, confidence, num_classes, nms_conf = 0.4):
             else:
                 out = torch.cat(seq,1)
                 output = torch.cat((output,out))
-
+    
+    # output이 initailize 되었는가?
+    # 안됐다면 batch내 이미지에서 단 하나의 detection도 없었음 => 0 반환
     try:
         return output
     except:
         return 0
+
+def bbox_iou(box1, box2):
+    """
+    Returns the IoU of two bounding boxes 
+    
+    
+    """
+
+    # bounding box들의 좌표값 추출
+    b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,0], box1[:,1], box1[:,2], box1[:,3]
+    b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,0], box2[:,1], box2[:,2], box2[:,3]
+    
+    # 겹치는 직사각형의 좌표값 추출
+    inter_rect_x1 =  torch.max(b1_x1, b2_x1)
+    inter_rect_y1 =  torch.max(b1_y1, b2_y1)
+    inter_rect_x2 =  torch.min(b1_x2, b2_x2)
+    inter_rect_y2 =  torch.min(b1_y2, b2_y2)
+    
+    # 겹치는 영역 계산
+    inter_area = torch.clamp(inter_rect_x2 - inter_rect_x1 + 1, min=0) * torch.clamp(inter_rect_y2 - inter_rect_y1 + 1, min=0)
+
+    # Union Area
+    b1_area = (b1_x2 - b1_x1 + 1)*(b1_y2 - b1_y1 + 1)
+    b2_area = (b2_x2 - b2_x1 + 1)*(b2_y2 - b2_y1 + 1)
+    
+    iou = inter_area / (b1_area + b2_area - inter_area)
+    
+    return iou
