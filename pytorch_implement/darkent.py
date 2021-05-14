@@ -20,7 +20,7 @@ import numpy as np
 
 import cv2
 
-from utils.utils import predict_transform
+from utils.utils import predict_transform, weights_init_normal
 from utils.parse_config import parse_cfg
 from utils.layers import EmptyLayer, DetectionLayer
 
@@ -255,94 +255,94 @@ class Darknet(nn.Module):
         
         return detections
 
-        def load_weights(self, weightfile):
-            fp = open(weightfile, "rb")
+    def load_weights(self, weightfile):
+        fp = open(weightfile, "rb")
 
-            # 첫 5개의 값은 header information임.
-            # 1. Major version number
-            # 2. Minor version number
-            # 3. Subversion number
-            # 4, 5. Image seen by the network (during training)
-            header = np.fromfile(fp, dtype = np.int32, count=5)
-            self.header = torch.form_numpy(header)
-            self.seen = self.header[3]
+        # 첫 5개의 값은 header information임.
+        # 1. Major version number
+        # 2. Minor version number
+        # 3. Subversion number
+        # 4, 5. Image seen by the network (during training)
+        header = np.fromfile(fp, dtype = np.int32, count=5)
+        self.header = torch.form_numpy(header)
+        self.seen = self.header[3]
 
-            # weight들을 np.ndarray로 로드
-            weights = np.fromfile(fp, dtype=np.float32)
+        # weight들을 np.ndarray로 로드
+        weights = np.fromfile(fp, dtype=np.float32)
 
-            ptr = 0 # weights array의 어느 위치에 있는지 계속 추적
-            for i in range(len(self.module_list)):
-                module_type = self.blocks[i + 1]["type"]
+        ptr = 0 # weights array의 어느 위치에 있는지 계속 추적
+        for i in range(len(self.module_list)):
+            module_type = self.blocks[i + 1]["type"]
 
-                # if type if convolutional load weight
-                # Otherwise ignore
-                if module_type == "convolutional":
-                    model = self.moduel_list[i]
+            # if type if convolutional load weight
+            # Otherwise ignore
+            if module_type == "convolutional":
+                model = self.moduel_list[i]
 
-                    try:
-                        batch_normalize = int(self.blocks[i+1]["batch_normalize"])
-                    except:
-                        batch_nomalize = 0
-                    
-                    conv = model[0]
+                try:
+                    batch_normalize = int(self.blocks[i+1]["batch_normalize"])
+                except:
+                    batch_nomalize = 0
+                
+                conv = model[0]
 
-                    if (batch_normalize):
-                        bn = model[1]
-            
-                        #Get the number of weights of Batch Norm Layer
-                        num_bn_biases = bn.bias.numel()
-            
-                        #Load the weights
-                        bn_biases = torch.from_numpy(weights[ptr:ptr + num_bn_biases])
-                        ptr += num_bn_biases
-            
-                        bn_weights = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
-                        ptr  += num_bn_biases
-            
-                        bn_running_mean = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
-                        ptr  += num_bn_biases
-            
-                        bn_running_var = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
-                        ptr  += num_bn_biases
-            
-                        #Cast the loaded weights into dims of model weights. 
-                        bn_biases = bn_biases.view_as(bn.bias.data)
-                        bn_weights = bn_weights.view_as(bn.weight.data)
-                        bn_running_mean = bn_running_mean.view_as(bn.running_mean)
-                        bn_running_var = bn_running_var.view_as(bn.running_var)
-            
-                        #Copy the data to model
-                        bn.bias.data.copy_(bn_biases)
-                        bn.weight.data.copy_(bn_weights)
-                        bn.running_mean.copy_(bn_running_mean)
-                        bn.running_var.copy_(bn_running_var)
+                if (batch_normalize):
+                    bn = model[1]
+        
+                    #Get the number of weights of Batch Norm Layer
+                    num_bn_biases = bn.bias.numel()
+        
+                    #Load the weights
+                    bn_biases = torch.from_numpy(weights[ptr:ptr + num_bn_biases])
+                    ptr += num_bn_biases
+        
+                    bn_weights = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    ptr  += num_bn_biases
+        
+                    bn_running_mean = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    ptr  += num_bn_biases
+        
+                    bn_running_var = torch.from_numpy(weights[ptr: ptr + num_bn_biases])
+                    ptr  += num_bn_biases
+        
+                    #Cast the loaded weights into dims of model weights. 
+                    bn_biases = bn_biases.view_as(bn.bias.data)
+                    bn_weights = bn_weights.view_as(bn.weight.data)
+                    bn_running_mean = bn_running_mean.view_as(bn.running_mean)
+                    bn_running_var = bn_running_var.view_as(bn.running_var)
+        
+                    #Copy the data to model
+                    bn.bias.data.copy_(bn_biases)
+                    bn.weight.data.copy_(bn_weights)
+                    bn.running_mean.copy_(bn_running_mean)
+                    bn.running_var.copy_(bn_running_var)
+                
+                else:
+                    #Number of biases
+                    num_biases = conv.bias.numel()
+                
+                    #Load the weights
+                    conv_biases = torch.from_numpy(weights[ptr: ptr + num_biases])
+                    ptr = ptr + num_biases
+                
+                    #reshape the loaded weights according to the dims of the model weights
+                    conv_biases = conv_biases.view_as(conv.bias.data)
+                
+                    #Finally copy the data
+                    conv.bias.data.copy_(conv_biases)
                     
-                    else:
-                        #Number of biases
-                        num_biases = conv.bias.numel()
-                    
-                        #Load the weights
-                        conv_biases = torch.from_numpy(weights[ptr: ptr + num_biases])
-                        ptr = ptr + num_biases
-                    
-                        #reshape the loaded weights according to the dims of the model weights
-                        conv_biases = conv_biases.view_as(conv.bias.data)
-                    
-                        #Finally copy the data
-                        conv.bias.data.copy_(conv_biases)
-                        
-                    #Let us load the weights for the Convolutional layers
-                    num_weights = conv.weight.numel()
-                    
-                    #Do the same as above for weights
-                    conv_weights = torch.from_numpy(weights[ptr:ptr+num_weights])
-                    ptr = ptr + num_weights
-                    
-                    conv_weights = conv_weights.view_as(conv.weight.data)
-                    conv.weight.data.copy_(conv_weights)
+                #Let us load the weights for the Convolutional layers
+                num_weights = conv.weight.numel()
+                
+                #Do the same as above for weights
+                conv_weights = torch.from_numpy(weights[ptr:ptr+num_weights])
+                ptr = ptr + num_weights
+                
+                conv_weights = conv_weights.view_as(conv.weight.data)
+                conv.weight.data.copy_(conv_weights)
 
 def get_test_input():
-    img = cv2.imread("./pytorch_implement/dog-cycle-car.png")
+    img = cv2.imread("./dog-cycle-car.png")
     img = cv2.resize(img, (416,416))          #Resize to the input dimension (cfg file과 동일하게 맞추기!! net_info)
     img_ =  img[:,:,::-1].transpose((2,0,1))  # BGR -> RGB | H X W X C -> C X H X W / ::-1 -> 해당 axis에서 순서를 반대로 바꿈(channel의 순서를 뒤집기) 
     img_ = img_[np.newaxis,:,:,:]/255.0       # Add a channel at 0 (for batch) | Normalise
@@ -365,7 +365,17 @@ def load_model(model_path, weights_path=None):
 
     model = Darknet(model_path).to(device)
 
-model = Darknet("./pytorch_implement/cfg/yolov3.cfg")
+    model.apply(weights_init_normal)
+
+    if weights_path:
+        if weights_path.endswith(".pth"):
+            model.load_state_dict(torch.load(weights_path, map_location=device))
+        else:
+            model.load_darknet_weights(weights_path)
+    
+    return model
+
+model = Darknet("./cfg/yolov3.cfg")
 inp = get_test_input()
 pred = model(x = inp, CUDA = torch.cuda.is_available())
 print(pred)

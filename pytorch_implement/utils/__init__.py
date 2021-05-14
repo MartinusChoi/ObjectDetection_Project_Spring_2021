@@ -3,4 +3,4 @@ from __future__ import division
 
 from .layers import EmptyLayer, DetectionLayer
 from .parse_config import parse_cfg
-from .utils import unique, predict_transform, write_result, bbox_iou
+from .utils import unique, predict_transform, write_result, bbox_iou, weights_init_normal
