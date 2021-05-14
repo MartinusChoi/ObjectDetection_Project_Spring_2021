@@ -350,6 +350,23 @@ def get_test_input():
     img_ = Variable(img_)                     # Convert to Variable
     return img_
 
+def load_model(model_path, weights_path=None):
+    """file로 부터 yolo model을 load
+
+    : param model_path ; model definition file(.cfg) 까지의 경로
+    : type model_path : str
+    : param weights_path ; weigths 혹은 checkpoint file(.weights or .pth) 파일 까지의 경로
+    : type weigth_paht ; str
+    : return ; Returns model
+    : rtype ; Darknet
+    """
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = Darknet(model_path).to(device)
+
+    
+
 model = Darknet("./pytorch_implement/cfg/yolov3.cfg")
 inp = get_test_input()
 pred = model(x = inp, CUDA = torch.cuda.is_available())
