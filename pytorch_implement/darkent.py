@@ -365,8 +365,6 @@ def load_model(model_path, weights_path=None):
 
     model = Darknet(model_path).to(device)
 
-    
-
 model = Darknet("./pytorch_implement/cfg/yolov3.cfg")
 inp = get_test_input()
 pred = model(x = inp, CUDA = torch.cuda.is_available())
