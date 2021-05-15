@@ -32,7 +32,7 @@ def resize(image, size):
 
 class ImageFolder(Dataset):
     def __init__(self, folder_path, transform=None):
-        self.files = sorted(glob.glob("%s/*.*" % folder_path))
+        self.files = sorted(glob.glob(f"{folder_path}/*.*"))
         self.transform = transform
 
     def __getitem__(self, index):
@@ -40,7 +40,8 @@ class ImageFolder(Dataset):
         img_path = self.files[index % len(self.files)]
         img = np.array(
             Image.open(img_path).convert('RGB'),
-            dtype=np.uint8)
+            dtype=np.uint8
+        )
 
         # Label Placeholder
         boxes = np.zeros((1, 5))
@@ -58,14 +59,17 @@ class ImageFolder(Dataset):
 class ListDataset(Dataset):
     def __init__(self, list_path, img_size=416, multiscale=True, transform=None):
         with open(list_path, "r") as file:
-            self.img_files = file.readlines()
+            self.img_files = file.readlines() # 각 줄을 element로 가지는 list
 
         self.label_files = []
+
         for path in self.img_files:
-            image_dir = os.path.dirname(path)
+            image_dir = os.path.dirname(path) # 경로명 path의 디렉터리 이름을 반환
             label_dir = "labels".join(image_dir.rsplit("images", 1))
+
             assert label_dir != image_dir, \
                 f"Image path must contain a folder named 'images'! \n'{image_dir}'"
+            
             label_file = os.path.join(label_dir, os.path.basename(path))
             label_file = os.path.splitext(label_file)[0] + '.txt'
             self.label_files.append(label_file)
@@ -84,10 +88,10 @@ class ListDataset(Dataset):
         #  Image
         # ---------
         try:
-
             img_path = self.img_files[index % len(self.img_files)].rstrip()
 
             img = np.array(Image.open(img_path).convert('RGB'), dtype=np.uint8)
+
         except Exception:
             print(f"Could not read image '{img_path}'.")
             return
@@ -102,6 +106,7 @@ class ListDataset(Dataset):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 boxes = np.loadtxt(label_path).reshape(-1, 5)
+                
         except Exception:
             print(f"Could not read label '{label_path}'.")
             return

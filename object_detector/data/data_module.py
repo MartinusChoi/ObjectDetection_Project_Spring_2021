@@ -6,6 +6,7 @@ from pytorch_lightning import LightningDataModule
 
 from torchvision import transforms
 
+from object_detector.utils.utils import worker_seed_set
 from object_detector.utils.datasets import ListDataset
 
 
@@ -25,17 +26,44 @@ class LitDataModule(LightningDataModule):
     def setup(self, stage : str = None):
         
         if stage == 'fit' or stage is None:
-            self.train_data = ListDataset(
+            self.dataset = ListDataset(
                 self.data_dir,
                 img_size=self.img_size,
                 transform=self.transform
             )
         
         if stage == 'test' or stage is None:
-            self.test_data = ListDataset(
+            self.test_dataset = ListDataset(
                 self.data_dir,
                 img_size=self.img_size,
                 transform=self.transform
             )
     
+    def train_dataloader(self):
+        return DataLoader(
+            self.dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            pin_memory=True,
+            collate_fn=self.dataset.collate_fn,
+            worker_init_fn=worker_seed_set
+        )
     
+    def val_dataloader(self):
+        return DataLoader(
+            self.dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            pin_memory=True,
+            collate_fn=self.dataset.collate_fn,
+            worker_init_fn=worker_seed_set
+        )
+    
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True,
+            collate_fn=self.test_dataset.collate_fn
+        )
