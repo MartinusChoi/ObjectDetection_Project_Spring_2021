@@ -10,7 +10,7 @@ from object_detector.utils.utils import worker_seed_set
 from object_detector.utils.datasets import ListDataset
 
 
-DATA_DIR = 'Data/data'
+DATA_DIR = '../object_detection_utils/data/'
 
 class LitDataModule(LightningDataModule):
     def __init__(self, batch_size=64, img_size:int = 416, data_dir:str = DATA_DIR):

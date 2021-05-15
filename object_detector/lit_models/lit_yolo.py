@@ -1,7 +1,7 @@
 import argparse
 
 import torch
-import torch.nn.functional
+import torch.nn.functional as F
 import torch.optim as optim
 import pytorch_lightning as pl
 
@@ -24,11 +24,11 @@ class Accuracy(pl.metrics.Accuracy):
         """
 
         if preds.min() < 0 or preds.max() > 1:
-            preds = torch.nn.functional.softmax(preds, dim=1)
+            preds = F.softmax(preds, dim=1)
         super.update(preds=preds, target=target)
 
 
-class LitYolo(pl.LightningModule):
+class LitYoloModule(pl.LightningModule):
 
     def __init__(self, args: argparse.Namespace = None):
         super().__init__()
