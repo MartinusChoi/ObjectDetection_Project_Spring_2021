@@ -10,6 +10,9 @@ from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from object_detector import lit_models, data
+from object_detector.utils.parse_cfg import parse_data_config
+from object_detector.utils.utils import load_classes
+from object_detector.models.models import load_model
 
 np.random.seed(42)
 torch.manual_seed(42)
@@ -28,6 +31,9 @@ def _set_up_parser():
 
     lit_model_group = parser.add_argument_group("LitModel Args")
     lit_models.LitYoloModule.add_to_argparse(lit_model_group)
+
+    # data arguments
+    parser.add_argument("--data", type=str, default="config/obj.data", help="Path to data config file (.data)")
 
     parser.add_argument("--help", "-h", action="help")
 
@@ -51,11 +57,15 @@ def main():
         mode='min'
     )
 
-    datamodule = data.LitDataModule
+    model = load_model(args.model, args.pretrained_weights)
+
+    mini_batch_size = model.hyperparams['batch'] // model.hyperparams['subdivisions']
+
+    datamodule = data.LitDataModule(args=args, mini_batch_size=mini_batch_size)
 
     lit_model_class = lit_models.LitYoloModule
 
-    lit_model = lit_model_class(args=args)
+    lit_model = lit_model_class(args=args, model=model)
 
     trainer = Trainer.from_argparse_args(args, default_root_dir=CHECKPOINT_DIR, callbacks=[checkpoint_callback], logger=[tb_logger])
 

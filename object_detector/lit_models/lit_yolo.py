@@ -30,30 +30,21 @@ class Accuracy(pl.metrics.Accuracy):
 
 class LitYoloModule(pl.LightningModule):
 
-    def __init__(self, args: argparse.Namespace = None):
+    def __init__(self, args: argparse.Namespace = None, model = None):
         super().__init__()
         self.args = vars(args) if args is not None else {}
 
         if self.args.seed != -1:
             provide_determinism(self.args.seed)
 
-        # Get data configuration
-        self.data_config = parse_data_config(args.data)
-        self.train_data_path = self.data_config["train"]
-        self.valid_data_path = self.data_config["valid"]
-        self.class_name = load_classes(self.data_config["names"])
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
         ##############
         # Create model
         ##############
-        self.model = load_model(self.args.model, self.args.pretrained_weights)
+        self.model = model
 
         # Print model
         if self.args.verbose:
             summary(self.model, input_size=(3, self.model.hyperparams['height'], self.model.hyperparams['height']))
-
-        self.mini_batch_size = self.model.hyperparams['batch'] // self.model.hyperparams['subdivisions']
 
         ##################
         # Create optimizer
@@ -71,7 +62,6 @@ class LitYoloModule(pl.LightningModule):
     def add_to_argparse(parser):
         parser.add_argument("--model", type=str, default="config/yolov3.cfg", help="Path to model definition file (.cfg)")
         parser.add_argument("--pretrained_weights", type=str, help="Path to checkpoint file (.weights or .pth). Starts training from checkpoint model")
-        parser.add_argument("--data", type=str, default="obj.data", help="Path to data config file (.data)")
         parser.add_argument("--verbose", action='store_true', help="Makes the training more verbose")
         return parser
     
