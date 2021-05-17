@@ -65,10 +65,10 @@ class ListDataset(Dataset):
 
         for path in self.img_files:
             image_dir = os.path.dirname(path) # 경로명 path의 디렉터리 이름을 반환
-            label_dir = "labels".join(image_dir.rsplit("images", 1))
+            label_dir = "label".join(image_dir.rsplit("img", 1))
 
             assert label_dir != image_dir, \
-                f"Image path must contain a folder named 'images'! \n'{image_dir}'"
+                f"Image path must contain a folder named 'img'! \n'{image_dir}'"
             
             label_file = os.path.join(label_dir, os.path.basename(path))
             label_file = os.path.splitext(label_file)[0] + '.txt'
@@ -128,6 +128,8 @@ class ListDataset(Dataset):
 
         # Drop invalid images
         batch = [data for data in batch if data is not None]
+
+        print(batch)
 
         paths, imgs, bb_targets = list(zip(*batch))
 

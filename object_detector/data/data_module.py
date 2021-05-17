@@ -1,9 +1,8 @@
 import argparse
 
 import torch
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import DataLoader
 
-import pytorch_lightning as pl
 from pytorch_lightning import LightningDataModule
 
 from object_detector.utils.utils import worker_seed_set, load_classes
@@ -20,13 +19,17 @@ class LitDataModule(LightningDataModule):
 
         self.mini_batch_size = mini_batch_size
 
-        self.data_config = parse_data_config(self.args.data)
+        self.data_config = parse_data_config(self.args.get("data"))
         self.train_list_path = self.data_config["train"]
         self.valid_list_path = self.data_config["valid"]
         self.class_names = load_classes(self.data_config["names"])
 
         self.transform = AUGMENTATION_TRANSFORMS
         self.img_size = img_size
+    
+    @staticmethod
+    def add_to_argparse(parser):
+        parser.add_argument("--data", type=str, default="config/obj.data", help="Path to data config file (.data)")
     
     def setup(self, stage : str = None):
         
@@ -58,7 +61,6 @@ class LitDataModule(LightningDataModule):
         return DataLoader(
             self.dataset,
             batch_size=self.mini_batch_size,
-            shuffle=True,
             pin_memory=True,
             collate_fn=self.dataset.collate_fn,
             worker_init_fn=worker_seed_set
@@ -68,7 +70,6 @@ class LitDataModule(LightningDataModule):
         return DataLoader(
             self.test_dataset,
             batch_size=self.mini_batch_size,
-            shuffle=False,
             pin_memory=True,
             collate_fn=self.test_dataset.collate_fn
         )

@@ -29,10 +29,14 @@ def _set_up_parser():
     trainer_parser._action_groups[1].title = "Trainer Args"
     parser = argparse.ArgumentParser(add_help=False, parents=[trainer_parser])
 
+    # Basic argument
+    parser.add_argument("--seed", type=int, default=-1, help="Makes results reproducable. Set -1 to disable.")
+
+    # Lightning model argument
     lit_model_group = parser.add_argument_group("LitModel Args")
     lit_models.LitYoloModule.add_to_argparse(lit_model_group)
-
-    # data arguments
+    
+    # LitDataModule argument
     parser.add_argument("--data", type=str, default="config/obj.data", help="Path to data config file (.data)")
 
     parser.add_argument("--help", "-h", action="help")
@@ -60,11 +64,10 @@ def main():
     model = load_model(args.model, args.pretrained_weights)
 
     mini_batch_size = model.hyperparams['batch'] // model.hyperparams['subdivisions']
-
-    datamodule = data.LitDataModule(args=args, mini_batch_size=mini_batch_size)
+    datamodule_class = data.LitDataModule
+    datamodule = datamodule_class(args=args, mini_batch_size=mini_batch_size)
 
     lit_model_class = lit_models.LitYoloModule
-
     lit_model = lit_model_class(args=args, model=model)
 
     trainer = Trainer.from_argparse_args(args, default_root_dir=CHECKPOINT_DIR, callbacks=[checkpoint_callback], logger=[tb_logger])

@@ -34,8 +34,8 @@ class LitYoloModule(pl.LightningModule):
         super().__init__()
         self.args = vars(args) if args is not None else {}
 
-        if self.args.seed != -1:
-            provide_determinism(self.args.seed)
+        if self.args.get("seed") != -1:
+            provide_determinism(self.args.get("seed"))
 
         ##############
         # Create model
@@ -43,7 +43,7 @@ class LitYoloModule(pl.LightningModule):
         self.model = model
 
         # Print model
-        if self.args.verbose:
+        if self.args.get("verbose"):
             summary(self.model, input_size=(3, self.model.hyperparams['height'], self.model.hyperparams['height']))
 
         ##################
@@ -63,7 +63,6 @@ class LitYoloModule(pl.LightningModule):
         parser.add_argument("--model", type=str, default="config/yolov3.cfg", help="Path to model definition file (.cfg)")
         parser.add_argument("--pretrained_weights", type=str, help="Path to checkpoint file (.weights or .pth). Starts training from checkpoint model")
         parser.add_argument("--verbose", action='store_true', help="Makes the training more verbose")
-        return parser
     
     def forward(self, x):
         return self.model(x)
@@ -88,7 +87,7 @@ class LitYoloModule(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
-        x, y = train_batch
+        _, x, y = train_batch
         z = self.model(x)
         loss, loss_components = compute_loss(z, y, self.model)
         self.log("train_loss", loss, on_epoch=True)
@@ -97,7 +96,7 @@ class LitYoloModule(pl.LightningModule):
         return loss
     
     def validation_step(self, val_batch, batch_idx):
-        x, y = val_batch
+        _, x, y = val_batch
         z = self.model(x)
         loss, loss_components = compute_loss(z, y, self.model)
         self.log("val_loss", loss, prog_bar=True)
@@ -105,7 +104,7 @@ class LitYoloModule(pl.LightningModule):
         self.log("val_acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
     
     def test_step(self, test_batch, batch_idx):
-        x, y = test_batch
+        _, x, y = test_batch
         z = self.model(x)
         self.test_acc(z, y)
         self.log("test_acc", self.test_acc, on_step=False, on_epoch=True)
