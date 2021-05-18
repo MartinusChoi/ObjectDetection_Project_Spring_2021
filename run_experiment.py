@@ -10,8 +10,6 @@ from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from object_detector import lit_models, data
-from object_detector.utils.parse_cfg import parse_data_config
-from object_detector.utils.utils import load_classes
 from object_detector.models.models import load_model
 
 np.random.seed(42)
@@ -54,7 +52,7 @@ def main():
     )
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
+        monitor='val_AP',
         dirpath=CHECKPOINT_DIR,
         filename='yolo-{epoch:02d}-{val_loss:.2f}',
         save_top_k=5,
